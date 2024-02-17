@@ -1,0 +1,255 @@
+syntax = "proto3";
+
+option go_package="github.com/nayutaco/NayutaHub2LspdProto";
+option java_multiple_files = true;
+option java_package = "io.grpc.lspd.service";
+option java_outer_classname = "LspdProto";
+
+package lspd;
+
+service LightningService {
+  /// Ping/Pong
+  rpc Ping(PingRequest) returns (PingReply) {}
+  /// Get LSP information
+  rpc ChannelInformation(ChannelInformationRequest) returns (ChannelInformationReply) {}
+
+  /// Open private zero-conf channel
+  rpc OpenChannel(OpenChannelRequest) returns (OpenChannelReply) {}
+  /// [on-the-fly]Register a on-the-fly channel creation information
+  rpc RegisterPayment(RegisterPaymentRequest) returns (RegisterPaymentReply) {}
+
+  /// [submarine swap]Register a Submarine Swap information
+  rpc RegisterSubmarine(Encrypted) returns (Encrypted) {}
+  /// [submarine swap]Request starting Submarine Swap
+  rpc ReceiveSubmarine(Encrypted) returns (ReceiveSubmarineReply) {}
+
+  /// Request query routes
+  rpc QueryRoutes(Encrypted) returns (Encrypted) {}
+
+  // Request time_lock_delta obtained from GetChanInfo() result.
+  // (time_lock_delta is the same as cltv_expiry_delta in channel_update message.)
+  // If GetChanInfo() result doesn't contain hub's lnrpc.RoutingPolicy, return error.
+  //   [GetChanInfo](https://lightning.engineering/api-docs/api/lnd/lightning/get-chan-info)
+  rpc GetTimeLockDelta(GetTimeLockDeltaRequest) returns (GetTimeLockDeltaReply) {}
+
+  /// Register user mail address
+  rpc RegisterUserInfo(Encrypted) returns (RegisterUserInfoReply) {}
+
+  /// Report message
+  rpc ReportMessage(Encrypted) returns (ReportReply) {}
+
+  /// Integrity get nonce message
+  rpc IntegrityNonce(Encrypted) returns (Encrypted) {}
+
+  /// Integrity Verify message
+  rpc IntegrityVerify(Encrypted) returns (IntegrityVerifyReply) {}
+}
+
+message PingRequest {
+  int32 nonce = 1;
+}
+message PingReply {
+  int32 nonce = 1;
+}
+
+message ChannelInformationRequest {
+  /// The identity pubkey of the Lightning node
+  string pubkey = 1 [ json_name = "pubkey" ];
+}
+
+message ChannelInformationReply {
+  /// The name of of LSP
+  string name = 1 [ json_name = "name" ];
+
+  /// The identity pubkey of the Lightning node
+  string pubkey = 2 [ json_name = "pubkey" ];
+
+  /// The network location of the lightning node, e.g. `12.34.56.78:9012` or
+  /// `localhost:10011`
+  string host = 3 [ json_name = "host" ];
+
+  /// The channel capacity in satoshis
+  // int64 channel_capacity = 4 [ json_name = "channel_capacity" ];
+
+  /// The target number of blocks that the funding transaction should be
+  /// confirmed by.
+  // int32 target_conf = 5 [ json_name = "target_conf" ];
+
+  /// The base fee charged regardless of the number of milli-satoshis sent.
+  int64 base_fee_msat = 6 [ json_name = "base_fee_msat" ];
+
+  /// The effective fee rate in milli-satoshis. The precision of this value goes
+  /// up to 6 decimal places, so 1e-6.
+  double fee_rate = 7 [ json_name = "fee_rate" ];
+
+  /// The required timelock delta for HTLCs forwarded over the channel.
+  uint32 time_lock_delta = 8 [ json_name = "time_lock_delta" ];
+
+  /// The minimum value in millisatoshi we will require for incoming HTLCs on
+  /// the channel.
+  // int64 min_htlc_msat = 9 [ json_name = "min_htlc_msat" ];
+
+  /// The feerate per 10000 sats(1/100 percent)
+  int64 channel_fee_permyriad = 10;
+
+  /// LSP pubkey(not LN node_id).
+  /// It uses for encoding `Encrypted.data` from remote peer.
+  bytes lsp_pubkey = 11;
+
+  /// The channel can be closed if not used this duration in seconds.
+  int64 max_inactive_duration = 12;
+
+  /// The minimum fee msat for On-The-Fly channel creation and Submarine Swap(not routing fee).
+  int64 channel_minimum_fee_msat = 13;
+
+  /// LSP version
+  string version = 14;
+
+  /// Submarine Script version
+  int32 swap_script_version = 15;
+}
+
+message OpenChannelRequest {
+  /// The identity pubkey of the Lightning node
+  string pubkey = 1 [ json_name = "pubkey" ];
+}
+
+message OpenChannelReply {
+  /// The transaction hash
+  string tx_hash = 1 [ json_name = "tx_hash" ];
+  /// The output index
+  uint32 output_index = 2 [ json_name = "output_index"];
+}
+
+message RegisterPaymentRequest {
+  /// The encrypted `PaymentInformation` by LSP pubkey
+  bytes blob = 3;
+}
+message RegisterPaymentReply {}
+message PaymentInformation {
+  /// The payment hash to intercept forwarding HTLC
+  bytes payment_hash = 1;
+  /// The payment address.
+  /// An optional payment addr to be included within the last hop of the route.
+  bytes payment_secret = 2;
+  /// The payee LND node_id
+  bytes destination = 3;
+  /// The incoming amount to LSP's LN node
+  int64 incoming_amount_msat = 4;
+  /// The outgoing amount from LSP's LN node to payee
+  int64 outgoing_amount_msat = 5;
+}
+
+message Encrypted {
+  /// The encrypted data by LSP pubkey
+  bytes data = 1;
+}
+
+message RegisterSubmarineRequest {
+  /// The pubkey to encrypt response data(`RegisterSubmarineReply`)
+  bytes encrypt_pubkey = 1;
+  /// THe payment_hash for swap script and LN invoice
+  bytes payment_hash = 2;
+  /// The repayment pubkey for swap script
+  bytes repay_pubkey = 3;
+  /// The payee LN node_id
+  bytes destination = 4;
+  /// Supported submarine Script version
+  int32 swap_script_version = 5;
+}
+message RegisterSubmarineReply {
+  /// swap address
+  string script_address = 1;
+  /// The HTLC pubkey for swap script
+  bytes htlc_pubkey = 2;
+}
+
+message ReceiveSubmarineRequest {
+  /// THe payment_hash to process Submarine Swap
+  bytes payment_hash = 1;
+  /// The LN invoice to send after open channel
+  string invoice = 2;
+}
+message ReceiveSubmarineReply {
+}
+
+message NodePair {
+  bytes from = 1;
+  bytes to = 2;
+}
+message QueryRoutesRequest {
+  /// The pubkey to encrypt response data(`QueryRouteReply`)
+  bytes encrypt_pubkey = 1;
+  /// The LN invoice to send after open channel
+  string invoice = 2;
+  /// The nodes to ignore routing
+  repeated bytes ignored_nodes = 3;
+  /// The pairs to ignore routing
+  repeated NodePair ignored_pairs = 4;
+  /// Specify amount if invoice not have amount(0: use `invoice` amount)
+  int64 amount = 5;
+}
+
+message GetTimeLockDeltaRequest {
+  // The ID to request channel time_lock_delta value.
+  uint64 chan_id = 1;
+}
+message GetTimeLockDeltaReply {
+  // time_lock_delta value from hub routing policy
+  uint32 time_lock_delta_hub = 1;
+  // time_lock_delta value from another node routing policy
+  uint32 time_lock_delta_another = 2;
+}
+
+message RegisterUserInfoRequest {
+  // mail address
+  string mail_address = 1;
+}
+message RegisterUserInfoReply {
+}
+
+message ReportRequest {
+  // category
+  string category = 1;
+  // level
+  enum ReportLevel {
+    REPORTLEVEL_NORMAL = 0;
+    REPORTLEVEL_NOTIFY = 1;
+    REPORTLEVEL_ALERT = 2;
+  }
+  ReportLevel level = 2;
+  // message
+  string message = 3;
+}
+message ReportReply {
+}
+
+enum IntegrityResult {
+  INTEGRITYRESULT_NONE = 0;
+  INTEGRITYRESULT_OK = 1;
+  INTEGRITYRESULT_NG = 2;
+}
+message IntegrityNonceRequest {
+  /// The pubkey to encrypt response data(`QueryRouteReply`)
+  bytes encrypt_pubkey = 1;
+  /// The identity pubkey of the Lightning node
+  bytes pubkey = 2;
+  /// The model -dependent ID
+  string id = 3;
+}
+message IntegrityNonceReply {
+  /// The nonce for Integrity API
+  string nonce = 1;
+}
+
+message IntegrityVerifyRequest {
+  /// The identity pubkey of the Lightning node
+  bytes pubkey = 1;
+  // Integrity token(empty string: return previous result if exist)
+  string token = 2;
+  /// The model -dependent ID
+  string id = 3;
+}
+message IntegrityVerifyReply {
+  IntegrityResult result = 1;
+}
